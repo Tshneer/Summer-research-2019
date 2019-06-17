@@ -37,7 +37,7 @@ const int total_number_of_patches_on_lattice = N;
 const int number_of_neighbors = D;
 
 int const test = 20000;
-long int const burn = 9090; 
+long int const burn = 9990; 
 long int const collect = test - burn;
 
 
@@ -542,6 +542,7 @@ int main(int argc, char** argv) {
 		myfile << mean_energy_of_a_patch << " ";
 		myfile << number_of_stripes << " ";
 		myfile << percent_of_spins_that_flip << " ";
+		myfile << man_seed << " ";
 		myfile << stripe_test_result << endl;
 		myfile.close();
 	}
@@ -562,6 +563,7 @@ int main(int argc, char** argv) {
 		myfile << "mean_energy_of_a_patch.\n ";
 		myfile << "number_of_stripes.\n ";
 		myfile << "percent_of_spins_that_flip.\n ";
+		myfile << "seed.\n";
 		myfile << "stripe_test_result" << endl;
 		myfile.close();
 	}
