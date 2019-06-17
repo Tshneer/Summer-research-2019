@@ -1,7 +1,10 @@
 // All information and variables names are based on those in Doi 10.1038/ncomms7664
 
-#include "pch.h"
+//#include "pch.h"
 #include <iostream>
+#include <gsl/gsl_rng.h>
+#include <stdio.h>
+#include <gsl/gsl_randist.h>
 
 #include <time.h>
 #include <fstream>
@@ -19,7 +22,7 @@
 #include <iomanip>
 #include <deque>
 #include <time.h>
-#include <random>
+
 #include <valarray>
 using namespace std;
 
@@ -28,18 +31,19 @@ using namespace std;
 #define D 4  /* number of neighbors */
 int nearest_neighbors[N][D]; //neighbor table
 
+
 const int length_of_side_of_lattice = L;
 const int total_number_of_patches_on_lattice = N;
 const int number_of_neighbors = D;
 
-int const test = 1000;
-long int const burn = 990; 
+int const test = 20000;
+long int const burn = 9090; 
 long int const collect = test - burn;
+
 
 double lattice[total_number_of_patches_on_lattice]; 
 
 double last_lattice[total_number_of_patches_on_lattice];
-
 
 double lattice_store[total_number_of_patches_on_lattice];
 
@@ -144,10 +148,15 @@ double b_ricker = 2.028; //as defined in 10.1038/ncomms7664
 
 double choice;
 
+int converted_lattice_points_at_time_t[total_number_of_patches_on_lattice];
+int converted_lattice_points_at_time_t_plus_1[total_number_of_patches_on_lattice];
+
+int time_t_minus_two[total_number_of_patches_on_lattice];
+
 int converted_lattice_points[total_number_of_patches_on_lattice];
-int* convert_all_lattice_points(double test_points_to_be_converted[])
+int* convert_all_lattice_points(double test_points_to_be_converted[total_number_of_patches_on_lattice])
 {
-	for (int i = 0; i <= (total_number_of_patches_on_lattice - 1); i++) {
+	for (int i = 0; i < total_number_of_patches_on_lattice; i++) {
 
 		if (test_points_to_be_converted[i] < lower_limit_of_low_value || test_points_to_be_converted[i] > upper_limit_of_high_value)
 		{
@@ -169,6 +178,27 @@ int* convert_all_lattice_points(double test_points_to_be_converted[])
 	}
 	return converted_lattice_points;
 }
+
+
+int counter = 0;
+double percent_of_spins_that_flip[test];
+double find_percent_of_spins_that_flip(int converted_lattice_points_at_time_t[total_number_of_patches_on_lattice], int converted_lattice_points_at_time_t_plus_1[total_number_of_patches_on_lattice],int counter) {
+	
+	double difference_between_time_t_plus_1_and_time_t=0;
+	//cout << difference_between_time_t_plus_1_and_time_t << endl;
+
+	for (int i = 0; i < total_number_of_patches_on_lattice; i++)
+	{
+		difference_between_time_t_plus_1_and_time_t = difference_between_time_t_plus_1_and_time_t + abs(converted_lattice_points_at_time_t_plus_1[i] - converted_lattice_points_at_time_t[i]);
+	}
+	//cout << difference_between_time_t_plus_1_and_time_t << endl;
+	percent_of_spins_that_flip[counter] = difference_between_time_t_plus_1_and_time_t/ total_number_of_patches_on_lattice/2*100;
+	
+	return percent_of_spins_that_flip[counter];
+}
+
+
+
 double mean_energy_of_a_patch;
 double find_mean_energy_of_each_patch(int converted_lattice_points[], int nearest_neighbors[total_number_of_patches_on_lattice][number_of_neighbors]) {
 	//The motivation for this definition of energy can be found at : https://iopscience.iop.org/article/10.1088/0253-6102/51/4/18/pdf
@@ -377,7 +407,24 @@ int what_kind_of_stripe_is_it(int is_this_an_ascending_diagonal_stripe, int is_t
 	return stripe_test_result;
 }
 
-int main() {
+int main(int argc, char** argv) {
+	const gsl_rng_type * T;
+	gsl_rng * r;
+
+
+	int man_seed = atol(argv[1]);
+	int i, n = 1;
+
+
+	gsl_rng_env_setup();
+
+	//void gsl_rng_set(const gsl_rng * r, unsigned long int '121');
+
+
+	T = gsl_rng_default;
+	r = gsl_rng_alloc(T);
+	gsl_rng_set(r, man_seed);
+
 
 	dispersal_fraction = 0.5;
 
@@ -391,24 +438,18 @@ int main() {
 
 	lower_limit_of_low_value = low_value_in_ricker_two_cycle - tolerance_to_be_considered_within_cycle; //lower lim of x -
 
-	std::default_random_engine generator;
-	std::uniform_real_distribution<double> distribution_plus(lower_limit_of_high_value, upper_limit_of_high_value);
-	std::uniform_real_distribution<double> distribution_minus(lower_limit_of_low_value, upper_limit_of_low_value);
-	std::uniform_real_distribution<double> distribution_decide(0, 1);
 	neighbor(); //create neighbor table
 
-
 	for (int i = 0; i < total_number_of_patches_on_lattice; i++) { //first lattice generation
-		choice = distribution_decide(generator);
+		choice = gsl_ran_flat(r, 0, 1);
 		if (choice >= radio) {
-			lattice[i] = distribution_plus(generator);
+			lattice[i] = gsl_ran_flat(r, lower_limit_of_high_value, upper_limit_of_high_value);
 		}
 		if (choice < radio) {
-			lattice[i] = distribution_minus(generator);
+			lattice[i] = gsl_ran_flat(r, lower_limit_of_low_value, upper_limit_of_low_value);;
 		}
 
 	}
-
 
 	for (long int year = 0; year < test; year++) {
 
@@ -417,10 +458,27 @@ int main() {
 		storing_a_final_snap_shot(lattice, year);
 
 		update_map_then_nearest_neighbor_interaction(lattice, last_lattice, dispersal_fraction);
-
+		
+		
 		if (year > burn) {
 			instantaneous_synchronization_across_time = instantaneous_synchronization_across_time + calculate_instantaneous_synchronization(lattice, last_lattice, length_of_side_of_lattice, year);
 		}
+
+		convert_all_lattice_points(lattice);
+
+		if ((year % 2 == 0) && (year % 4 == 0))
+		{
+			for (int i = 0; i < total_number_of_patches_on_lattice; i++)
+			{
+				time_t_minus_two[i] = converted_lattice_points[i];				
+			}
+		}
+		if (year % 2 == 0 && (year % 4 == 2))
+		{
+			counter++;
+			find_percent_of_spins_that_flip(converted_lattice_points,time_t_minus_two,counter);
+		}
+
 	}
 	
 	unscaled_synchronization_parameter = instantaneous_synchronization_across_time;
@@ -483,6 +541,7 @@ int main() {
 		myfile << burn << " ";
 		myfile << mean_energy_of_a_patch << " ";
 		myfile << number_of_stripes << " ";
+		myfile << percent_of_spins_that_flip << " ";
 		myfile << stripe_test_result << endl;
 		myfile.close();
 	}
@@ -502,6 +561,7 @@ int main() {
 		myfile << "burn.\n ";
 		myfile << "mean_energy_of_a_patch.\n ";
 		myfile << "number_of_stripes.\n ";
+		myfile << "percent_of_spins_that_flip.\n ";
 		myfile << "stripe_test_result" << endl;
 		myfile.close();
 	}
@@ -530,6 +590,17 @@ int main() {
 	}
 	else cout << "Unable to open file";
 
+
+	myfile.open("percent_of_spins_that_flip.csv");//All the files are sent to matlab for visualization. In the matlab file I do variance = sus1 - sus2.^2 
+	if (myfile.is_open())
+	{
+		for (int i = 0; i < counter; i++) {
+			myfile << percent_of_spins_that_flip[i] << " ";
+		}
+
+		myfile.close();
+	}
+	else cout << "Unable to open file";
 
 	return 0;
 
